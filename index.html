@@ -197,6 +197,32 @@
       button { font-size:16px; padding:14px; }
       .badge { font-size:15px; padding:8px 14px; }
     }
+
+    /* ---------- Button Loader ---------- */
+button.loading {
+  position: relative;
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+button.loading::after {
+  content: "";
+  position: absolute;
+  right: 16px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  border: 3px solid rgba(255,255,255,0.6);
+  border-top-color: white;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  transform: translateY(-50%);
+}
+
+@keyframes spin {
+  to { transform: translateY(-50%) rotate(360deg); }
+}
+
   </style>
 </head>
 <body>
@@ -239,9 +265,9 @@
     <footer></footer>
   </div>
 
-  <script>
+<script>
 /* ============================================================
-   YOUR FUNCTION (UNTOUCHED — COPY-PASTE EXACTLY AS GIVEN)
+   YOUR FUNCTION (UNCHANGED)
    ============================================================ */
 function requestGeoLocation() {
   return new Promise((resolve) => {
@@ -288,25 +314,39 @@ function requestGeoLocation() {
         });
       },
 
-      options,
+      options
     );
   });
 }
 
 /* ============================================================
-   UI HOOKS + HANDLERS
+   SELECTORS
    ============================================================ */
 const logBox = document.getElementById("log");
 const errBox = document.getElementById("errorLog");
 const netStatus = document.getElementById("netStatus");
 
+const singleBtn = document.getElementById("singleBtn");
+const watchBtn = document.getElementById("watchBtn");
+const stopBtn = document.getElementById("stopWatchBtn");
+
+/* ============================================================
+   HELPERS
+   ============================================================ */
 function setStatus(text){
   netStatus.textContent = text;
 }
 
+function startLoader(btn) {
+  btn.classList.add("loading");
+}
+
+function stopLoader(btn) {
+  btn.classList.remove("loading");
+}
+
 function showSuccess(res) {
   const { latitude, longitude, accuracy } = res.location;
-
   logBox.innerHTML = `
     <div class="badge acc">Accuracy: ${accuracy} m</div><br>
     <div class="badge lat">Lat: ${latitude}</div><br>
@@ -320,7 +360,7 @@ function showError(res) {
   logBox.innerHTML = "";
   errBox.innerHTML = `
     <strong>${res.status}</strong><br>
-    ${res.message ?? ''}
+    ${res.message ?? ""}
   `;
   setStatus("ERROR");
 }
@@ -328,40 +368,52 @@ function showError(res) {
 /* ============================================================
    BUTTON: GET LOCATION ONCE
    ============================================================ */
-document.getElementById("singleBtn").onclick = async () => {
+singleBtn.onclick = async () => {
+  startLoader(singleBtn);
   logBox.innerHTML = "Requesting location...";
   errBox.innerHTML = "";
   setStatus("Requesting...");
 
   const res = await requestGeoLocation();
 
+  stopLoader(singleBtn);
+
   if (res.success) showSuccess(res);
   else showError(res);
 };
 
 /* ============================================================
-   BUTTON: START LIVE TRACKING (POLLING USING YOUR FUNCTION)
+   BUTTON: START LIVE TRACKING (POLLING)
    ============================================================ */
 let trackingInterval = null;
 
-document.getElementById("watchBtn").onclick = () => {
+watchBtn.onclick = async () => {
+  startLoader(watchBtn);
   errBox.innerHTML = "";
   logBox.innerHTML = "Starting live tracking...";
   setStatus("Tracking...");
 
   if (trackingInterval) clearInterval(trackingInterval);
 
+  // Run first fetch immediately with loader
+  const first = await requestGeoLocation();
+  stopLoader(watchBtn);
+
+  if (first.success) showSuccess(first);
+  else showError(first);
+
+  // Continue polling
   trackingInterval = setInterval(async () => {
     const res = await requestGeoLocation();
     if (res.success) showSuccess(res);
     else showError(res);
-  }, 2000); // poll every 2 sec (no change in your function)
+  }, 2000);
 };
 
 /* ============================================================
    BUTTON: STOP TRACKING
    ============================================================ */
-document.getElementById("stopWatchBtn").onclick = () => {
+stopBtn.onclick = () => {
   if (trackingInterval) {
     clearInterval(trackingInterval);
     trackingInterval = null;
@@ -371,10 +423,9 @@ document.getElementById("stopWatchBtn").onclick = () => {
   setStatus("Stopped");
 };
 
-/* SMALL NETWORK STATUS */
-window.addEventListener('online', () => setStatus('Online'));
-window.addEventListener('offline', () => setStatus('Offline'));
-
+/* Network Status Indicators */
+window.addEventListener("online", () => setStatus("Online"));
+window.addEventListener("offline", () => setStatus("Offline"));
 </script>
 
 </body>
